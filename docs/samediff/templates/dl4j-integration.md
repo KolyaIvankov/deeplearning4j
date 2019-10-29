@@ -1,14 +1,13 @@
 ---
-title: SameDiff - an autodifferentiation engine in Deeplearning4j
-short_title: Overview
-description: `SameDiff` - its purpose, advantages and limitations.
+title: How `SameDiff` fits into Deeplearning4j
+short_title: DL4J-Integration
+description: How to create custom `SameDiff` layers and vertices to employ in standard DL4J networks
 category: SameDiff
 weight: 5
 ---
 
 
-# Getting started: How SameDiff fits into DL4J
-
+# How `SameDiff` fits into Deeplearning4j
 We have already seen [how to use `SameDiff` in a standalone way](./samediff/overview) to create a trainable network. 
 However, as we've mentioned there, in order to boost productivity it is advantageous to employ `SameDiff` as a means 
 to make custom building blocks within a standard DL4J network. With `SameDiff` you can easily create layers and 
@@ -21,21 +20,21 @@ So, let's begin.
 [`SameDiff` layer definition code on GitHub](https://github.com/eclipse/deeplearning4j-examples/blob/master/dl4j-examples/src/main/java/org/deeplearning4j/examples/samediff/dl4j/layers/MinimalSameDiffDense.java)
 [`SameDiff` layer usage code on GitHub](https://github.com/eclipse/deeplearning4j-examples/blob/master/dl4j-examples/src/main/java/org/deeplearning4j/examples/samediff/dl4j/Ex1BasicSameDiffLayerExample.java)
 
-We start by showing how to create a simple dense layer and then build it into a standard DL4J network. 
+We start by showing how to make a simple dense layer and then build it into a standard DL4J network. 
 
 ### Creating layer class 
-First, we create our layer as separate class. This class will be called `MinimalSameDiffDense`, and it will extend the 
+We make our layer as a separate class. We name it `MinimalSameDiffDense` here, and it will extend the 
 abstract class `SameDiffLayer`
 ```java
 public class MinimalSameDiffDense extends SameDiffLayer 
 ```
-We shall have four fields in this class; three premanent ones - number of inputs, number of outputs and activation:
+The class will have three fields that we shall serilize - number of inputs, number of outputs and activation:
 ```java
 private int nIn;
 private int nOut;
 private Activation activation;
 ```
-as well as a weight initialization scheme
+as well as a weight initialization scheme, that needs not be serialized:
 ```java
 private WeightInit weightInit;
 ```
@@ -49,10 +48,13 @@ public MinimalSameDiffDense(int nIn, int nOut, Activation activation, WeightInit
 }
 ```
 
-There are four abstract methods in the parent class `SameDiffLayer` we need to implement explicitly in our new
-class: these are `defineLayer(...)`, `defineParameters(...)`, `initializeParameters(...)` and `getOutputType(...)`. 
+There are four abstract methods in the parent class `SameDiffLayer` we need to implement explicitly in any of its 
+concrete child classes: these are `defineLayer(...)`, `defineParameters(...)`, `initializeParameters(...)` and 
+`getOutputType(...)`. 
 
-We start with `defineParameters(...)`. In this method set, what **trainable** parameters will be used in the network. 
+### Overriding parameter creation methods
+
+We start with `defineParameters(...)`. In this method we set, what **trainable** parameters will be used in the network. 
 For a simple dense layer, those are weight matrix and bias vector, the shape of which will be determined by the fields 
 `nIn` and `nOut`:   
 ```java
@@ -62,12 +64,12 @@ public void defineParameters(SDlayerParams params) {
     params.addBiasParam(DefaultParamInitializer.BIAS_KEY, 1, nOut);
 }
 ```
-The keys within `DefaultParamInitializer` are nothing but strings; you thus may thus easily add parameters named with 
-keys of your choice. They will be re-employed in the two following methods.  
+The keys within `DefaultParamInitializer` are nothing but `String`'s; you thus may thus easily add parameters named with 
+keys of your choice. They will be re-employed in the two upcoming methods.  
 
-In `initializeParameters(...)` we tell how the variables introduced in `defineParameters(...)` are to be filled with
-initial values. Here we just use the `weightInit` field we've provided in constructor, as our initialization scheme for 
-weights, and fill bias vector with zeros:
+Next, in `initializeParameters(...)` we tell how the variables introduced in `defineParameters(...)` are to be filled 
+with initial values. Here we just use the `weightInit` field we've provided in constructor, as our initialization scheme 
+for weights, and fill bias vector with zeros:
 ```java
 @Override
 public void initializeParameters(Map<String, INDArray> params) {
@@ -75,10 +77,10 @@ public void initializeParameters(Map<String, INDArray> params) {
     initWeights(nIn, nOut, weightInit, params.get(DefaultParamInitializer.WEIGHT_KEY));
 }
 ```
-Note that we've used two different ways of array initialization: filling with random and pre-defined values.
+Note that we've used two different ways of array initialization: filling with randomized and pre-defined values.
 
-The method `getOutputType(...)` is inherited from the very abstract `Layer` class, and we fill it with a more or less
-default implementation:
+The method `getOutputType(...)` is inherited from the very abstract `Layer` class, and we implement it in a more or less
+default way:
 ```java
 @Override
 public InputType getOutputType(int layerIndex, InputType inputType) {return InputType.feedForward(nOut);}
@@ -159,12 +161,13 @@ implementation. Their use goes beyond the scope of this simple example - for adv
 [`SameDiff` lambda layer definition code on GitHub](https://github.com/eclipse/deeplearning4j-examples/blob/master/dl4j-examples/src/main/java/org/deeplearning4j/examples/samediff/dl4j/layers/L2NormalizeLambdaLayer.java)
 [`SameDiff` lambda layer usage code on GitHub](https://github.com/eclipse/deeplearning4j-examples/blob/master/dl4j-examples/src/main/java/org/deeplearning4j/examples/samediff/dl4j/Ex2LambdaLayer.java)
 
-Quite often it is some custom activation that needs to be tried, and is not present in the pool. The cleanest way to
-create a layer with such an activation is to use a linear layer (i.d. with `Activation.IDENTITY` for activation 
-function) followed by a **lambda layer**, which realizes the custom activation.
+Quite often it is a custom activation for a layer that one wishes to try, and which is not yet present in the pool. The 
+cleanest way to create such a layer is to use a combination of a standard with identity activation followed by a 
+**lambda layer**, which realizes the custom activation itself.
 
-Lambda layers are even easier to create than the usual `SameDiff` layers: the only method to override is 
-`defineLayer(...)`. In the following example, we define a lambda that normalizes the input along specified dimensions.
+Lambda layers are even easier to create than the usual `SameDiff` layers: the only method to override there is 
+`defineLayer(...)`. In the following example, we define a lambda layer that normalizes the input along specified 
+dimensions.
 ```java
 public class L2NormalizeLambdaLayer extends SameDiffLambdaLayer {
 
@@ -188,12 +191,12 @@ public class L2NormalizeLambdaLayer extends SameDiffLambdaLayer {
      */
 }
 ```
-Observe that our layer class now extends `SameDiffLambdaLayer` that itself is an extension (though in fact it is rather
-a narrowing) of `SameDiffLayer`. The fields and the constructor require no further comments. Note that `defineLayer` now 
-has only two arguments - the `SameDiff` instance and the variable containing input - as activations (normally) have no 
-trainable parameters (also, see the  full example code what the `true` token is used for in `norm2` function).
+Observe that our layer class now extends `SameDiffLambdaLayer` that itself is an extension of `SameDiff` layer (though 
+in fact it is rather a narrowing). The fields and the constructor require no further comments. Note that `defineLayer` 
+now has only two arguments - the `SameDiff` instance and the variable containing input - as activations (normally) have 
+no trainable parameters (also, see the  full example code what the `true` token is used for in `norm2` function).
 
-Now you may simply build the lambda layer into your network by doing something like that:
+And we are done with creating our lambda layer. Now you may simply build the lambda layer into your network like so:
 
 ```java
 MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
@@ -207,8 +210,7 @@ MultiLayerConfiguration conf = new NeuralNetConfiguration.Builder()
     //...
     .build();
 ```
-And we are done - this two layers effectively serve in our network as a 2d-convolutional layer with a custom activation 
-function.
+And that's it - now these two layers effectively work as a 2d-convolutional layer with a custom activation.
 
 ## Example: lambda vertices
 
@@ -249,4 +251,3 @@ where `"in"` is the name of the input layer for the dense layers.
 >While `SameDiffLambdaVertex` is in general non-parametric, you may also create parametric vertices by extending the 
 superclass `SameDiffVertex`. However, in practice layers, lambda layers and lambda vertices usually suffice for a task
 of any complexity. To learn more about `SameDiffVertex`, check our [`SameDiffVertex` source code on GitHub](https://github.com/eclipse/deeplearning4j/blob/master/deeplearning4j/deeplearning4j-nn/src/main/java/org/deeplearning4j/nn/conf/layers/samediff/SameDiffVertex.java).
-

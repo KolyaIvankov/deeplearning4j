@@ -162,6 +162,17 @@ counterintuitive that you need to tell the output when we've already told the sy
 taken in the loss function. However, it may not be the case for some advanced networks with e.g. intermediate results
 used during training or labels preprocessing, and we reserve this freedom for the user.
 
+### Making predictions
+
+We shall look more thoroughly at how to make predictions with `SameDiff` networks in the section on [execution](./samediff/execution).
+For now, a streamline way to do this for a given image may look as follows:
+```java
+INDArray prediction = samediff.batchOutput().input("input", features).output("output").execSingle();
+```
+where `features` is an `INDArray` representing the input image.
+
+### Saving and loading
+
 Finally, to save and load your model, you simply use
 ```java
 String modelFileName = "sameDiffModel.fd";
@@ -171,7 +182,7 @@ samediff samediffFromFile = fromFlatFile(modelFileName);
 
 ### The full code
 
-So. let us bring all together now:
+For consistency, let us now bring all the code together:
  
 ```java
 //Define terwork topology
@@ -216,7 +227,11 @@ sameddiff.fit(trainData, numEpochs);
 //Evaluate on test set:
 String outputVariable = "output";
 Evaluation evaluation = new Evaluation();
-sd.evaluate(testData, outputVariable, evaluation);
+samediff.evaluate(testData, outputVariable, evaluation);
+
+//Load a MNIST image and make a prediction
+?????????
+INDArray predictions = samediff.outputSingle(new Haspmap().put("input", features), "output");
 
 //Print evaluation statistics:
 System.out.println(evaluation.stats());
